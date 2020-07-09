@@ -87,6 +87,8 @@ class LinkedInResume:
     def __init__(self, resume_file):
         self.resume_file = resume_file
         self.data = {}
+        self.CFA = False
+        self.CPA = False
 
     def parse_pages(self):
         """Extract objects in pdf pages, and populate them in a nested list
@@ -120,6 +122,18 @@ class LinkedInResume:
             #                          key=lambda x: x.y0, reverse=True))
             self.pages.append(layout)
 
+    def check_cetificated(self, obj):
+        text = obj.get_text()
+        if ("cfa" in text.lower() or "chartered financial analyst" in text.lower()):
+            self.CFA = True
+        if ("cpa" in obj.get_text().lower() or "certified public accountant" in text.lower()):
+            self.CPA = True
+
+    def parse_name(self, obj):
+        if self.is_name(obj):
+            self.name = self.get_section_name(obj)
+            self.data['name'] = self.name
+
     def filter(self, obj):
         """A simple filter for pdfminer.layout.LTXXX objects
 
@@ -135,6 +149,9 @@ class LinkedInResume:
         for t in TEXT_FILTER:
             if obj.get_text() == t:
                 return False
+        # parse name and check cetificate in filter
+        self.parse_name(obj)
+        self.check_cetificated(obj)
         return True
 
     def split(self):
@@ -249,8 +266,6 @@ class LinkedInResume:
         for obj in self.main_panel_objs:
             if self.is_name(obj):
                 section_objs = []
-                self.name = self.get_section_name(obj)
-                self.data['name'] = self.name
                 sections["Basic Info"] = section_objs
             elif self.is_section_head(obj, ''):
                 section_objs = []
@@ -490,6 +505,18 @@ class LinkedInResume:
     def get_edu_df(self):
         if hasattr(self, 'education'):
             return self.data_to_dataframe(self.education)
+
+    def get_cetificate_status(self):
+        cetificate = ""
+        if self.CPA:
+            if self.CFA:
+                cetificate = "CPA, CFA"
+            else:
+                cetificate = "CPA"
+        elif self.CFA:
+            cetificate = "CFA"
+        return {"name": self.name if hasattr(self, "name") else "",
+                "cetificate": cetificate}
 
     def _parse_and_save(self):
         self.parse_pages()
